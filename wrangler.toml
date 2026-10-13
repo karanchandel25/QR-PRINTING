@@ -1,0 +1,20 @@
+name = "qr-print-worker"
+main = "src/worker.js"
+compatibility_date = "2026-10-01"
+
+# Put index.html in ./public and use Workers Static Assets.
+[assets]
+directory = "./public"
+binding = "ASSETS"
+run_worker_first = ["/api/*"]
+
+[[kv_namespaces]]
+binding = "ORDERS"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+[[r2_buckets]]
+binding = "PRINT_FILES"
+bucket_name = "qr-print-files"
+
+[vars]
+ENVIRONMENT = "production"
