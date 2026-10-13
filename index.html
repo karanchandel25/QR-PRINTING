@@ -4,57 +4,63 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Neelam Computer And Online - PDF Print</title>
+  <title>Neelam Computer And Online - Auto Print</title>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js"></script>
+
   <style>
     body {
       font-family: Arial, sans-serif;
-      background: #f2f5fa;
-      margin: 0;
+      background: #f1f5f9;
       padding: 20px;
+      margin: 0;
     }
     .card {
       max-width: 440px;
-      margin: 35px auto;
+      margin: 30px auto;
+      padding: 24px;
       background: white;
-      padding: 25px;
       border-radius: 14px;
-      box-shadow: 0 3px 16px #0002;
+      box-shadow: 0 3px 15px #0002;
       text-align: center;
     }
     h2 { color: #174ea6; }
     input, button {
       width: 100%;
       box-sizing: border-box;
-      margin-top: 16px;
       padding: 13px;
+      margin-top: 15px;
       font-size: 16px;
     }
     button {
-      background: #1769d2;
       color: white;
+      background: #1769d2;
       border: 0;
       border-radius: 7px;
       cursor: pointer;
     }
     button:disabled { opacity: .6; }
-    #status { margin-top: 18px; overflow-wrap: anywhere; }
+    #status { overflow-wrap: anywhere; }
     small { color: #555; }
   </style>
 </head>
 <body>
   <div class="card">
     <h2>Neelam Computer And Online</h2>
-    <p>अपनी PDF फाइल चुनें और प्रिंट करवाएँ।</p>
+    <p>PDF या फोटो चुनें — A4 पेज पर फिट होकर प्रिंट होगी।</p>
 
     <form id="printForm">
       <input
         type="file"
         id="file"
-        accept=".pdf,application/pdf"
+        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
         required
       >
-      <small>केवल PDF फाइल • अधिकतम 3 MB • एक कॉपी</small>
-      <button id="submitBtn" type="submit">PDF प्रिंट करें</button>
+      <small>
+        PDF, JPG, JPEG, PNG<br>
+        PDF अधिकतम 3 MB, फोटो अधिकतम 2 MB
+      </small>
+      <button id="printBtn" type="submit">प्रिंट करें</button>
     </form>
 
     <p id="status" role="status"></p>
@@ -66,36 +72,139 @@
 
     const form = document.getElementById("printForm");
     const fileInput = document.getElementById("file");
-    const button = document.getElementById("submitBtn");
+    const button = document.getElementById("printBtn");
     const status = document.getElementById("status");
 
-    form.addEventListener("submit", async function (event) {
+    function loadImage(file) {
+      return new Promise((resolve, reject) => {
+        const url = URL.createObjectURL(file);
+        const image = new Image();
+
+        image.onload = () => {
+          URL.revokeObjectURL(url);
+          resolve(image);
+        };
+
+        image.onerror = () => {
+          URL.revokeObjectURL(url);
+          reject(new Error("फोटो खुल नहीं पाई।"));
+        };
+
+        image.src = url;
+      });
+    }
+
+    async function makeA4Pdf(file) {
+      const image = await loadImage(file);
+
+      const { jsPDF } = window.jspdf;
+      const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "mm",
+        format: "a4",
+        compress: true
+      });
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 5;
+      const maxWidth = pageWidth - margin * 2;
+      const maxHeight = pageHeight - margin * 2;
+
+      const ratio = Math.min(
+        maxWidth / image.naturalWidth,
+        maxHeight / image.naturalHeight
+      );
+
+      const width = image.naturalWidth * ratio;
+      const height = image.naturalHeight * ratio;
+      const x = (pageWidth - width) / 2;
+      const y = (pageHeight - height) / 2;
+
+      const isPng = file.type === "image/png";
+      const canvas = document.createElement("canvas");
+      canvas.width = image.naturalWidth;
+      canvas.height = image.naturalHeight;
+
+      const context = canvas.getContext("2d");
+
+      if (!isPng) {
+        context.fillStyle = "#ffffff";
+        context.fillRect(0, 0, canvas.width, canvas.height);
+      }
+
+      context.drawImage(image, 0, 0);
+
+      const imageData = isPng
+        ? canvas.toDataURL("image/png")
+        : canvas.toDataURL("image/jpeg", 0.92);
+
+      pdf.addImage(
+        imageData,
+        isPng ? "PNG" : "JPEG",
+        x, y, width, height
+      );
+
+      return pdf.output("blob");
+    }
+
+    form.addEventListener("submit", async (event) => {
       event.preventDefault();
 
       const file = fileInput.files[0];
-
       if (!file) {
-        status.textContent = "पहले PDF फाइल चुनें।";
+        status.textContent = "पहले फाइल चुनें।";
         return;
       }
 
-      if (file.size > 3 * 1024 * 1024) {
-        status.textContent = "PDF 3 MB से छोटी होनी चाहिए।";
+      const isPdf = file.type === "application/pdf" ||
+                    file.name.toLowerCase().endsWith(".pdf");
+
+      const isJpg = /\.(jpe?g)$/i.test(file.name) &&
+                    file.type === "image/jpeg";
+
+      const isPng = /\.png$/i.test(file.name) &&
+                    file.type === "image/png";
+
+      if (!isPdf && !isJpg && !isPng) {
+        status.textContent = "केवल PDF, JPG, JPEG या PNG चुनें।";
         return;
       }
 
-      if (!file.name.toLowerCase().endsWith(".pdf")) {
-        status.textContent = "केवल PDF फाइल अपलोड करें।";
+      if (file.size > (isPdf ? 3 : 2) * 1024 * 1024) {
+        status.textContent = isPdf
+          ? "PDF 3 MB से छोटी होनी चाहिए।"
+          : "फोटो 2 MB से छोटी होनी चाहिए।";
         return;
       }
-
-      const data = new FormData();
-      data.append("file", file);
 
       button.disabled = true;
-      status.textContent = "फाइल भेजी जा रही है, कृपया प्रतीक्षा करें...";
 
       try {
+        let uploadFile = file;
+
+        if (!isPdf) {
+          status.textContent = "फोटो को A4 PDF में बदला जा रहा है...";
+          const blob = await makeA4Pdf(file);
+
+          if (blob.size > 3 * 1024 * 1024) {
+            throw new Error(
+              "बनी हुई PDF 3 MB से बड़ी है। छोटी फोटो चुनें।"
+            );
+          }
+
+          uploadFile = new File(
+            [blob],
+            "photo-a4.pdf",
+            { type: "application/pdf" }
+          );
+        }
+
+        const data = new FormData();
+        data.append("file", uploadFile);
+
+        status.textContent = "प्रिंटर को फाइल भेज रहे हैं...";
+
         const response = await fetch(WORKER_URL, {
           method: "POST",
           body: data
@@ -103,17 +212,17 @@
 
         const result = await response.json();
 
-        if (response.ok && result.success) {
-          status.textContent =
-            "आपकी PDF प्रिंट कतार में भेज दी गई है।";
-          form.reset();
-        } else {
-          status.textContent =
-            result.error || "प्रिंट नहीं हो पाया। दुकान पर संपर्क करें।";
+        if (!response.ok || !result.success) {
+          throw new Error(result.error || "प्रिंट भेजना विफल हुआ।");
         }
+
+        status.textContent =
+          "फाइल प्रिंट कतार में भेज दी गई है।";
+        form.reset();
+
       } catch (error) {
         status.textContent =
-          "कनेक्शन नहीं हुआ। इंटरनेट जाँचकर दोबारा प्रयास करें।";
+          error.message || "त्रुटि हुई। कृपया दोबारा प्रयास करें।";
       } finally {
         button.disabled = false;
       }
