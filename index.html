@@ -4,58 +4,120 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Neelam Computer And Online</title>
+  <title>Neelam Computer And Online - PDF Print</title>
   <style>
     body {
       font-family: Arial, sans-serif;
-      max-width: 600px;
-      margin: 40px auto;
+      background: #f2f5fa;
+      margin: 0;
       padding: 20px;
-      background: #f2f5f9;
     }
-    main {
+    .card {
+      max-width: 440px;
+      margin: 35px auto;
       background: white;
       padding: 25px;
-      border-radius: 12px;
+      border-radius: 14px;
+      box-shadow: 0 3px 16px #0002;
+      text-align: center;
     }
     h2 { color: #174ea6; }
     input, button {
       width: 100%;
-      padding: 12px;
-      margin-top: 14px;
       box-sizing: border-box;
+      margin-top: 16px;
+      padding: 13px;
+      font-size: 16px;
     }
     button {
-      background: #174ea6;
+      background: #1769d2;
       color: white;
       border: 0;
-      border-radius: 6px;
+      border-radius: 7px;
       cursor: pointer;
     }
+    button:disabled { opacity: .6; }
+    #status { margin-top: 18px; overflow-wrap: anywhere; }
+    small { color: #555; }
   </style>
 </head>
 <body>
-  <main>
+  <div class="card">
     <h2>Neelam Computer And Online</h2>
-    <p>अपना डॉक्यूमेंट प्रिंट करने के लिए अपलोड करें।</p>
-    <form id="uploadForm">
-      <label>PDF या फोटो चुनें</label>
-      <input id="document" type="file"
-        accept=".pdf,.jpg,.jpeg,.png" required>
-      <label>कॉपी की संख्या</label>
-      <input id="copies" type="number"
-        min="1" max="5" value="1" required>
-      <button type="submit">डॉक्यूमेंट भेजें</button>
+    <p>अपनी PDF फाइल चुनें और प्रिंट करवाएँ।</p>
+
+    <form id="printForm">
+      <input
+        type="file"
+        id="file"
+        accept=".pdf,application/pdf"
+        required
+      >
+      <small>केवल PDF फाइल • अधिकतम 3 MB • एक कॉपी</small>
+      <button id="submitBtn" type="submit">PDF प्रिंट करें</button>
     </form>
-    <p id="message"></p>
-  </main>
+
+    <p id="status" role="status"></p>
+  </div>
+
   <script>
-    document.getElementById('uploadForm')
-      .addEventListener('submit', function(e) {
-        e.preventDefault();
-        document.getElementById('message').textContent =
-          'यह डेमो पेज है। प्रिंट भेजने के लिए सुरक्षित सर्वर सेटअप बाकी है।';
-      });
+    const WORKER_URL =
+      "https://neelam-print-server.karanchandel25.workers.dev/";
+
+    const form = document.getElementById("printForm");
+    const fileInput = document.getElementById("file");
+    const button = document.getElementById("submitBtn");
+    const status = document.getElementById("status");
+
+    form.addEventListener("submit", async function (event) {
+      event.preventDefault();
+
+      const file = fileInput.files[0];
+
+      if (!file) {
+        status.textContent = "पहले PDF फाइल चुनें।";
+        return;
+      }
+
+      if (file.size > 3 * 1024 * 1024) {
+        status.textContent = "PDF 3 MB से छोटी होनी चाहिए।";
+        return;
+      }
+
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        status.textContent = "केवल PDF फाइल अपलोड करें।";
+        return;
+      }
+
+      const data = new FormData();
+      data.append("file", file);
+
+      button.disabled = true;
+      status.textContent = "फाइल भेजी जा रही है, कृपया प्रतीक्षा करें...";
+
+      try {
+        const response = await fetch(WORKER_URL, {
+          method: "POST",
+          body: data
+        });
+
+        const result = await response.json();
+
+        if (response.ok && result.success) {
+          status.textContent =
+            "आपकी PDF प्रिंट कतार में भेज दी गई है।";
+          form.reset();
+        } else {
+          status.textContent =
+            result.error || "प्रिंट नहीं हो पाया। दुकान पर संपर्क करें।";
+        }
+      } catch (error) {
+        status.textContent =
+          "कनेक्शन नहीं हुआ। इंटरनेट जाँचकर दोबारा प्रयास करें।";
+      } finally {
+        button.disabled = false;
+      }
+    });
   </script>
 </body>
 </html>
