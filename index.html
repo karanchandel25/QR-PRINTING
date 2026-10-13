@@ -1,0 +1,61 @@
+
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Neelam Computer And Online</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      max-width: 600px;
+      margin: 40px auto;
+      padding: 20px;
+      background: #f2f5f9;
+    }
+    main {
+      background: white;
+      padding: 25px;
+      border-radius: 12px;
+    }
+    h2 { color: #174ea6; }
+    input, button {
+      width: 100%;
+      padding: 12px;
+      margin-top: 14px;
+      box-sizing: border-box;
+    }
+    button {
+      background: #174ea6;
+      color: white;
+      border: 0;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <h2>Neelam Computer And Online</h2>
+    <p>अपना डॉक्यूमेंट प्रिंट करने के लिए अपलोड करें।</p>
+    <form id="uploadForm">
+      <label>PDF या फोटो चुनें</label>
+      <input id="document" type="file"
+        accept=".pdf,.jpg,.jpeg,.png" required>
+      <label>कॉपी की संख्या</label>
+      <input id="copies" type="number"
+        min="1" max="5" value="1" required>
+      <button type="submit">डॉक्यूमेंट भेजें</button>
+    </form>
+    <p id="message"></p>
+  </main>
+  <script>
+    document.getElementById('uploadForm')
+      .addEventListener('submit', function(e) {
+        e.preventDefault();
+        document.getElementById('message').textContent =
+          'यह डेमो पेज है। प्रिंट भेजने के लिए सुरक्षित सर्वर सेटअप बाकी है।';
+      });
+  </script>
+</body>
+</html>
