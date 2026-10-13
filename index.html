@@ -72,7 +72,7 @@
 
       <small>
         PDF, JPG, JPEG, PNG<br>
-        PDF adhiktam 20 MB, photo adhiktam 20 MB
+        Maximum file size: 20 MB
       </small>
 
       <button id="printBtn" type="submit">प्रिंट करें</button>
@@ -85,12 +85,13 @@
     const WORKER_URL =
       "https://neelam-print-server.karanchandel25.workers.dev/";
 
+    const MAX_SIZE = 20 * 1024 * 1024;
+
     const form = document.getElementById("printForm");
     const fileInput = document.getElementById("file");
     const button = document.getElementById("printBtn");
     const status = document.getElementById("status");
 
-    // PDF banane wali library ko zarurat par load karein.
     async function loadJsPDF() {
       if (window.jspdf && window.jspdf.jsPDF) {
         return window.jspdf.jsPDF;
@@ -110,7 +111,7 @@
             script.onload = resolve;
             script.onerror = () => {
               script.remove();
-              reject(new Error("Library load nahi hui"));
+              reject(new Error("Library load failed"));
             };
             document.head.appendChild(script);
           });
@@ -119,37 +120,82 @@
             return window.jspdf.jsPDF;
           }
         } catch (error) {
-          // Agla CDN try karein.
+          // Try the next CDN.
         }
       }
 
       throw new Error(
-        "PDF library load nahi hui. Internet check karke dobara try karein."
+        "PDF library load nahi hui. Internet check karein."
       );
     }
 
     function loadImage(file) {
       return new Promise((resolve, reject) => {
         const url = URL.createObjectURL(file);
-        const image = new Image();
+        const img = new Image();
 
-        image.onload = () => {
+        img.onload = () => {
           URL.revokeObjectURL(url);
-          resolve(image);
+          resolve(img);
         };
 
-        image.onerror = () => {
+        img.onerror = () => {
           URL.revokeObjectURL(url);
-          reject(new Error("Photo khul nahi pai. Dusri photo chunein."));
+          reject(new Error("Photo khul nahi pai."));
         };
 
-        image.src = url;
+        img.src = url;
       });
     }
 
     async function makeA4Pdf(file) {
       const jsPDF = await loadJsPDF();
-      const image = await loadImage(file);
+      const img = await loadImage(file);
+
+      const pageWidth = 210;
+      const pageHeight = 297;
+      const margin = 5;
+
+      const availableWidth = pageWidth - margin * 2;
+      const availableHeight = pageHeight - margin * 2;
+
+      const ratio = Math.min(
+        availableWidth / img.naturalWidth,
+        availableHeight / img.naturalHeight
+      );
+
+      // A4 ke liye image size control karein.
+      // Isse bahut badi photos ka PDF size kam rahega.
+      const maxCanvasWidth = 1654;
+      const maxCanvasHeight = 2339;
+
+      const scale = Math.min(
+        maxCanvasWidth / img.naturalWidth,
+        maxCanvasHeight / img.naturalHeight,
+        1
+      );
+
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(
+        1, Math.round(img.naturalWidth * scale)
+      );
+      canvas.height = Math.max(
+        1, Math.round(img.naturalHeight * scale)
+      );
+
+      const ctx = canvas.getContext("2d");
+
+      if (!ctx) {
+        throw new Error("Photo process nahi ho pai.");
+      }
+
+      // White background, including transparent PNG areas.
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+      // JPEG compression se PDF size control mein rahega.
+      const imageData = canvas.toDataURL("image/jpeg", 0.88);
 
       const pdf = new jsPDF({
         orientation: "portrait",
@@ -158,46 +204,17 @@
         compress: true
       });
 
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const margin = 5;
-      const maxWidth = pageWidth - margin * 2;
-      const maxHeight = pageHeight - margin * 2;
-
-      const ratio = Math.min(
-        maxWidth / image.naturalWidth,
-        maxHeight / image.naturalHeight
-      );
-
-      const width = image.naturalWidth * ratio;
-      const height = image.naturalHeight * ratio;
+      const width = img.naturalWidth * ratio;
+      const height = img.naturalHeight * ratio;
       const x = (pageWidth - width) / 2;
       const y = (pageHeight - height) / 2;
 
-      const canvas = document.createElement("canvas");
-      canvas.width = image.naturalWidth;
-      canvas.height = image.naturalHeight;
-
-      const context = canvas.getContext("2d");
-
-      if (!context) {
-        throw new Error("Photo process nahi ho pai.");
-      }
-
-      // Photo ke transparent hisse bhi safed rahenge.
-      context.fillStyle = "#ffffff";
-      context.fillRect(0, 0, canvas.width, canvas.height);
-      context.drawImage(image, 0, 0);
-
-      const isPng = /\.png$/i.test(file.name);
-      const imageData = isPng
-        ? canvas.toDataURL("image/png")
-        : canvas.toDataURL("image/jpeg", 0.92);
-
       pdf.addImage(
         imageData,
-        isPng ? "PNG" : "JPEG",
-        x, y, width, height
+        "JPEG",
+        x, y, width, height,
+        undefined,
+        "FAST"
       );
 
       return pdf.output("blob");
@@ -221,19 +238,19 @@
       const isPng = name.endsWith(".png");
 
       if (!isPdf && !isJpg && !isPng) {
-        status.textContent = "Sirf PDF, JPG, JPEG ya PNG file chunein.";
+        status.textContent =
+          "Sirf PDF, JPG, JPEG ya PNG file chunein.";
         return;
       }
 
       if (file.size === 0) {
-        status.textContent = "File khali hai. Dusri file chunein.";
+        status.textContent = "File khali hai.";
         return;
       }
 
-      if (file.size > (20 * 1024 * 1024) {
-        status.textContent = isPdf
-          ? "PDF 20 MB se chhoti honi chahiye."
-          : "Photo 20 MB se chhoti honi chahiye.";
+      if (file.size > MAX_SIZE) {
+        status.textContent =
+          "File 20 MB se chhoti honi chahiye.";
         return;
       }
 
@@ -243,13 +260,14 @@
         let uploadFile = file;
 
         if (!isPdf) {
-          status.textContent = "Photo ko A4 PDF mein badal rahe hain...";
+          status.textContent =
+            "Photo ko A4 PDF mein badal rahe hain...";
 
           const blob = await makeA4Pdf(file);
 
-          if (blob.size > 20 * 1024 * 1024) {
+          if (blob.size > MAX_SIZE) {
             throw new Error(
-              "Taiyar PDF 3 MB se badi hai. Chhoti photo chunein."
+              "Taiyar PDF 20 MB se badi hai."
             );
           }
 
@@ -263,7 +281,8 @@
         const data = new FormData();
         data.append("file", uploadFile);
 
-        status.textContent = "Print server ko file bhej rahe hain...";
+        status.textContent =
+          "File print server ko bhej rahe hain...";
 
         const response = await fetch(WORKER_URL, {
           method: "POST",
@@ -276,13 +295,14 @@
           result = await response.json();
         } catch {
           throw new Error(
-            "Server ka jawab samajh nahi aaya. Dobara try karein."
+            "Server ka jawab nahi mila. Dobara try karein."
           );
         }
 
         if (!response.ok || !result.success) {
           throw new Error(
-            result.error || "Print bhejne mein dikkat hui."
+            result.error ||
+            "Print server ne file accept nahi ki."
           );
         }
 
@@ -294,7 +314,7 @@
       } catch (error) {
         status.textContent =
           error.message ||
-          "Error aaya. Internet aur print server check karein.";
+          "Error aaya. Internet aur server check karein.";
       } finally {
         button.disabled = false;
       }
