@@ -1,325 +1,273 @@
-```html
 <!DOCTYPE html>
 <html lang="hi">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Neelam Computer And Online - Auto Print</title>
-
-  <style>
-    * { box-sizing: border-box; }
-
-    body {
-      font-family: Arial, sans-serif;
-      background: #f1f5f9;
-      padding: 20px;
-      margin: 0;
-    }
-
-    .card {
-      max-width: 440px;
-      margin: 30px auto;
-      padding: 24px;
-      background: white;
-      border-radius: 14px;
-      box-shadow: 0 3px 15px #0002;
-      text-align: center;
-    }
-
-    h2 { color: #174ea6; }
-
-    input, button {
-      width: 100%;
-      padding: 13px;
-      margin-top: 15px;
-      font-size: 16px;
-    }
-
-    button {
-      color: white;
-      background: #1769d2;
-      border: 0;
-      border-radius: 7px;
-      cursor: pointer;
-    }
-
-    button:disabled {
-      opacity: .6;
-      cursor: wait;
-    }
-
-    #status {
-      overflow-wrap: anywhere;
-      line-height: 1.5;
-    }
-
-    small { color: #555; }
-  </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Neelam Computer And Online - Print Studio</title>
+<style>
+*{box-sizing:border-box}
+body{font-family:Arial,sans-serif;background:#f1f5f9;margin:0;padding:16px;color:#172033}
+.wrap{max-width:760px;margin:12px auto;background:#fff;padding:22px;border-radius:14px;box-shadow:0 3px 16px #0002}
+h1{font-size:23px;color:#174ea6;margin:0 0 8px}
+p{line-height:1.5}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:12px}
+.field{margin-top:13px;text-align:left}
+label{display:block;font-weight:700;font-size:14px;margin-bottom:6px}
+input,select,button{width:100%;padding:11px;font-size:15px;border:1px solid #cbd5e1;border-radius:7px;background:#fff}
+input[type=range]{padding:0}
+button{border:0;background:#1769d2;color:white;font-weight:700;cursor:pointer;margin-top:12px}
+button.secondary{background:#475569}
+button:disabled{opacity:.55;cursor:wait}
+small{color:#475569}
+#status{overflow-wrap:anywhere;line-height:1.5;font-weight:600}
+#preview{width:100%;height:520px;border:1px solid #cbd5e1;border-radius:8px;background:#e2e8f0;margin-top:10px}
+.hidden{display:none!important}
+.note{background:#eff6ff;border-radius:8px;padding:10px;font-size:13px;margin-top:12px}
+hr{border:0;border-top:1px solid #e2e8f0;margin:20px 0}
+</style>
 </head>
-
 <body>
-  <div class="card">
-    <h2>Neelam Computer And Online</h2>
-    <p>PDF ya photo chunein. Photo A4 page par fit hokar print hogi.</p>
+<div class="wrap">
+<h1>NEELAM COMPUTER AND ONLINE</h1>
+<p>PDF या फोटो चुनें, सेटिंग करें, Preview देखें और फिर PrintNode पर भेजें।</p>
 
-    <form id="printForm">
-      <input
-        type="file"
-        id="file"
-        accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-        required
-      >
+<div class="field">
+<label for="file">PDF या फोटो चुनें</label>
+<input type="file" id="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
+<small>PDF, JPG, JPEG, PNG. आपका Cloudflare Worker अभी केवल 3 MB तक की PDF स्वीकार करता है।</small>
+</div>
 
-      <small>
-        PDF, JPG, JPEG, PNG<br>
-        Maximum file size: 20 MB
-      </small>
+<div id="pdfSettings" class="hidden">
+<hr><h3>PDF सेटिंग</h3>
+<div class="field">
+<label for="pages">कौन से पेज प्रिंट करने हैं?</label>
+<input id="pages" type="text" placeholder="उदाहरण: 1-5 या 2,5,10">
+<small>खाली छोड़ने पर सभी पेज।</small>
+</div>
+</div>
 
-      <button id="printBtn" type="submit">प्रिंट करें</button>
-    </form>
+<div id="photoSettings" class="hidden">
+<hr><h3>फोटो सेटिंग</h3>
+<div class="grid">
+<div class="field">
+<label for="layout">एक A4 पर फोटो</label>
+<select id="layout">
+<option value="1">1 फोटो</option>
+<option value="2">2 फोटो</option>
+<option value="4">4 फोटो</option>
+</select>
+</div>
+<div class="field">
+<label for="copies">कुल फोटो की संख्या</label>
+<input id="copies" type="number" min="1" max="100" value="1">
+</div>
+<div class="field">
+<label for="rotation">फोटो घुमाएँ</label>
+<select id="rotation">
+<option value="0">0°</option>
+<option value="90">90°</option>
+<option value="180">180°</option>
+<option value="270">270°</option>
+</select>
+</div>
+<div class="field">
+<label for="zoom">Zoom / Crop</label>
+<input id="zoom" type="range" min="1" max="2.5" step="0.1" value="1">
+<small id="zoomValue">1.0×</small>
+</div>
+</div>
+<div class="note">2 या 4 फोटो चुनने पर फोटो A4 पर बराबर जगह में लगेंगी। Zoom बढ़ाने पर फोटो के किनारे कट सकते हैं।</div>
+</div>
 
-    <p id="status" role="status" aria-live="polite"></p>
-  </div>
+<div class="field">
+<label for="printCopies">PDF की कॉपी संख्या</label>
+<input id="printCopies" type="number" min="1" max="20" value="1">
+</div>
 
-  <script>
-    const WORKER_URL =
-      "https://neelam-print-server.karanchandel25.workers.dev/";
+<button id="prepareBtn" type="button">Preview तैयार करें</button>
+<iframe id="preview" title="Print preview" class="hidden"></iframe>
+<button id="printBtn" type="button" disabled>PrintNode पर भेजें</button>
+<button id="resetBtn" type="button" class="secondary">रीसेट करें</button>
+<p id="status" role="status" aria-live="polite"></p>
+</div>
 
-    const MAX_SIZE = 20 * 1024 * 1024;
+<script>
+const WORKER_URL="https://neelam-print-server.karanchandel25.workers.dev/";
+const MAX_WORKER_SIZE=3*1024*1024;
+const fileInput=document.getElementById("file");
+const pdfSettings=document.getElementById("pdfSettings");
+const photoSettings=document.getElementById("photoSettings");
+const pagesInput=document.getElementById("pages");
+const layoutInput=document.getElementById("layout");
+const copiesInput=document.getElementById("copies");
+const rotationInput=document.getElementById("rotation");
+const zoomInput=document.getElementById("zoom");
+const zoomValue=document.getElementById("zoomValue");
+const printCopiesInput=document.getElementById("printCopies");
+const prepareBtn=document.getElementById("prepareBtn");
+const printBtn=document.getElementById("printBtn");
+const resetBtn=document.getElementById("resetBtn");
+const preview=document.getElementById("preview");
+const status=document.getElementById("status");
+let preparedBlob=null,previewUrl=null,selectedFile=null,fileKind=null;
 
-    const form = document.getElementById("printForm");
-    const fileInput = document.getElementById("file");
-    const button = document.getElementById("printBtn");
-    const status = document.getElementById("status");
+function setStatus(t){status.textContent=t;}
+function loadScript(url,test){
+ if(test())return Promise.resolve();
+ return new Promise((resolve,reject)=>{
+  const s=document.createElement("script");
+  s.src=url;
+  s.onload=()=>test()?resolve():reject(new Error("PDF library load nahi hui."));
+  s.onerror=()=>{s.remove();reject(new Error("PDF library load nahi hui. Internet check karein."));};
+  document.head.appendChild(s);
+ });
+}
+async function getPDFLib(){
+ await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js",()=>!!window.PDFLib);
+ return window.PDFLib;
+}
+function positiveInt(input,max,label){
+ const n=Number(input.value);
+ if(!Number.isInteger(n)||n<1||n>max)throw new Error(label+" 1 se "+max+" ke beech rakhein.");
+ return n;
+}
+function parsePages(text,total){
+ if(!text.trim())return Array.from({length:total},(_,i)=>i);
+ const chosen=new Set();
+ for(const raw of text.split(",")){
+  const part=raw.trim();
+  if(!part)continue;
+  const range=part.match(/^(\d+)\s*-\s*(\d+)$/);
+  if(range){
+   const a=Number(range[1]),b=Number(range[2]);
+   if(a<1||b<a||b>total)throw new Error("Page range 1-"+total+" ke beech rakhein.");
+   for(let n=a;n<=b;n++)chosen.add(n-1);
+  }else if(/^\d+$/.test(part)){
+   const n=Number(part);
+   if(n<1||n>total)throw new Error("Page number 1-"+total+" ke beech rakhein.");
+   chosen.add(n-1);
+  }else throw new Error("Page aise likhein: 1-5 ya 2,5,10");
+ }
+ if(!chosen.size)throw new Error("Sahi page number likhein.");
+ return [...chosen].sort((a,b)=>a-b);
+}
+async function makeSelectedPdf(file){
+ const {PDFDocument}=await getPDFLib();
+ const source=await PDFDocument.load(await file.arrayBuffer());
+ const indices=parsePages(pagesInput.value,source.getPageCount());
+ const copies=positiveInt(printCopiesInput,20,"PDF copies");
+ const out=await PDFDocument.create();
+ for(let c=0;c<copies;c++){
+  const selected=await out.copyPages(source,indices);
+  selected.forEach(p=>out.addPage(p));
+ }
+ return new Blob([await out.save()],{type:"application/pdf"});
+}
+function loadImage(file){
+ return new Promise((resolve,reject)=>{
+  const url=URL.createObjectURL(file),img=new Image();
+  img.onload=()=>{URL.revokeObjectURL(url);resolve(img);};
+  img.onerror=()=>{URL.revokeObjectURL(url);reject(new Error("Photo khul nahi pai."));};
+  img.src=url;
+ });
+}
+function drawPhoto(ctx,img,x,y,w,h,zoom,rotation){
+ ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+ ctx.translate(x+w/2,y+h/2);ctx.rotate(rotation*Math.PI/180);
+ const rotated=rotation%180!==0;
+ const sw=rotated?img.naturalHeight:img.naturalWidth;
+ const sh=rotated?img.naturalWidth:img.naturalHeight;
+ const scale=Math.max(w/sw,h/sh)*zoom;
+ ctx.drawImage(img,-img.naturalWidth*scale/2,-img.naturalHeight*scale/2,img.naturalWidth*scale,img.naturalHeight*scale);
+ ctx.restore();
+}
+async function makePhotoPdf(file){
+ const {PDFDocument}=await getPDFLib();
+ const img=await loadImage(file);
+ const total=positiveInt(copiesInput,100,"Photo count");
+ const perPage=Number(layoutInput.value),rotation=Number(rotationInput.value),zoom=Number(zoomInput.value);
+ const pdf=await PDFDocument.create();
+ const W=595.28,H=841.89,margin=18,gap=12;
+ let remaining=total;
+ while(remaining>0){
+  const page=pdf.addPage([W,H]);
+  const slots=Math.min(perPage,remaining);
+  const cols=perPage===1?1:2;
+  const rows=perPage===4?2:(perPage===2?2:1);
+  const cw=(W-margin*2-gap*(cols-1))/cols;
+  const ch=(H-margin*2-gap*(rows-1))/rows;
+  const canvas=document.createElement("canvas");
+  canvas.width=1240;canvas.height=1754;
+  const ctx=canvas.getContext("2d");
+  if(!ctx)throw new Error("Photo process nahi ho pai.");
+  ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
+  const sx=canvas.width/W,sy=canvas.height/H;
+  for(let i=0;i<slots;i++){
+   const col=i%cols,row=Math.floor(i/cols);
+   const x=margin+col*(cw+gap),y=margin+row*(ch+gap);
+   drawPhoto(ctx,img,x*sx+3,y*sy+3,(cw-6)*sx,(ch-6)*sy,zoom,rotation);
+  }
+  const jpg=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",0.88));
+  if(!jpg)throw new Error("Photo PDF nahi ban pai.");
+  const embedded=await pdf.embedJpg(await jpg.arrayBuffer());
+  page.drawImage(embedded,{x:0,y:0,width:W,height:H});
+  remaining-=slots;
+ }
+ return new Blob([await pdf.save()],{type:"application/pdf"});
+}
+function clearPreview(){
+ preparedBlob=null;printBtn.disabled=true;preview.classList.add("hidden");
+ if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null;}
+}
+fileInput.addEventListener("change",()=>{
+ clearPreview();selectedFile=fileInput.files[0]||null;
+ if(!selectedFile){pdfSettings.classList.add("hidden");photoSettings.classList.add("hidden");return;}
+ const n=selectedFile.name.toLowerCase();
+ fileKind=n.endsWith(".pdf")?"pdf":(/\.(jpg|jpeg|png)$/.test(n)?"image":null);
+ pdfSettings.classList.toggle("hidden",fileKind!=="pdf");
+ photoSettings.classList.toggle("hidden",fileKind!=="image");
+ setStatus(fileKind?"File chuni gayi: "+selectedFile.name:"Sirf PDF, JPG, JPEG ya PNG chunein.");
+});
+zoomInput.addEventListener("input",()=>zoomValue.textContent=Number(zoomInput.value).toFixed(1)+"×");
 
-    async function loadJsPDF() {
-      if (window.jspdf && window.jspdf.jsPDF) {
-        return window.jspdf.jsPDF;
-      }
-
-      const urls = [
-        "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.2/jspdf.umd.min.js",
-        "https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js",
-        "https://unpkg.com/jspdf@2.5.2/dist/jspdf.umd.min.js"
-      ];
-
-      for (const url of urls) {
-        try {
-          await new Promise((resolve, reject) => {
-            const script = document.createElement("script");
-            script.src = url;
-            script.onload = resolve;
-            script.onerror = () => {
-              script.remove();
-              reject(new Error("Library load failed"));
-            };
-            document.head.appendChild(script);
-          });
-
-          if (window.jspdf && window.jspdf.jsPDF) {
-            return window.jspdf.jsPDF;
-          }
-        } catch (error) {
-          // Try the next CDN.
-        }
-      }
-
-      throw new Error(
-        "PDF library load nahi hui. Internet check karein."
-      );
-    }
-
-    function loadImage(file) {
-      return new Promise((resolve, reject) => {
-        const url = URL.createObjectURL(file);
-        const img = new Image();
-
-        img.onload = () => {
-          URL.revokeObjectURL(url);
-          resolve(img);
-        };
-
-        img.onerror = () => {
-          URL.revokeObjectURL(url);
-          reject(new Error("Photo khul nahi pai."));
-        };
-
-        img.src = url;
-      });
-    }
-
-    async function makeA4Pdf(file) {
-      const jsPDF = await loadJsPDF();
-      const img = await loadImage(file);
-
-      const pageWidth = 210;
-      const pageHeight = 297;
-      const margin = 5;
-
-      const availableWidth = pageWidth - margin * 2;
-      const availableHeight = pageHeight - margin * 2;
-
-      const ratio = Math.min(
-        availableWidth / img.naturalWidth,
-        availableHeight / img.naturalHeight
-      );
-
-      // A4 ke liye image size control karein.
-      // Isse bahut badi photos ka PDF size kam rahega.
-      const maxCanvasWidth = 1654;
-      const maxCanvasHeight = 2339;
-
-      const scale = Math.min(
-        maxCanvasWidth / img.naturalWidth,
-        maxCanvasHeight / img.naturalHeight,
-        1
-      );
-
-      const canvas = document.createElement("canvas");
-      canvas.width = Math.max(
-        1, Math.round(img.naturalWidth * scale)
-      );
-      canvas.height = Math.max(
-        1, Math.round(img.naturalHeight * scale)
-      );
-
-      const ctx = canvas.getContext("2d");
-
-      if (!ctx) {
-        throw new Error("Photo process nahi ho pai.");
-      }
-
-      // White background, including transparent PNG areas.
-      ctx.fillStyle = "#ffffff";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      // JPEG compression se PDF size control mein rahega.
-      const imageData = canvas.toDataURL("image/jpeg", 0.88);
-
-      const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "mm",
-        format: "a4",
-        compress: true
-      });
-
-      const width = img.naturalWidth * ratio;
-      const height = img.naturalHeight * ratio;
-      const x = (pageWidth - width) / 2;
-      const y = (pageHeight - height) / 2;
-
-      pdf.addImage(
-        imageData,
-        "JPEG",
-        x, y, width, height,
-        undefined,
-        "FAST"
-      );
-
-      return pdf.output("blob");
-    }
-
-    form.addEventListener("submit", async (event) => {
-      event.preventDefault();
-
-      if (button.disabled) return;
-
-      const file = fileInput.files[0];
-
-      if (!file) {
-        status.textContent = "Pehle file chunein.";
-        return;
-      }
-
-      const name = file.name.toLowerCase();
-      const isPdf = name.endsWith(".pdf");
-      const isJpg = /\.(jpg|jpeg)$/i.test(name);
-      const isPng = name.endsWith(".png");
-
-      if (!isPdf && !isJpg && !isPng) {
-        status.textContent =
-          "Sirf PDF, JPG, JPEG ya PNG file chunein.";
-        return;
-      }
-
-      if (file.size === 0) {
-        status.textContent = "File khali hai.";
-        return;
-      }
-
-      if (file.size > MAX_SIZE) {
-        status.textContent =
-          "File 20 MB se chhoti honi chahiye.";
-        return;
-      }
-
-      button.disabled = true;
-
-      try {
-        let uploadFile = file;
-
-        if (!isPdf) {
-          status.textContent =
-            "Photo ko A4 PDF mein badal rahe hain...";
-
-          const blob = await makeA4Pdf(file);
-
-          if (blob.size > MAX_SIZE) {
-            throw new Error(
-              "Taiyar PDF 20 MB se badi hai."
-            );
-          }
-
-          uploadFile = new File(
-            [blob],
-            "photo-a4.pdf",
-            { type: "application/pdf" }
-          );
-        }
-
-        const data = new FormData();
-        data.append("file", uploadFile);
-
-        status.textContent =
-          "File print server ko bhej rahe hain...";
-
-        const response = await fetch(WORKER_URL, {
-          method: "POST",
-          body: data
-        });
-
-        let result;
-
-        try {
-          result = await response.json();
-        } catch {
-          throw new Error(
-            "Server ka jawab nahi mila. Dobara try karein."
-          );
-        }
-
-        if (!response.ok || !result.success) {
-          throw new Error(
-            result.error ||
-            "Print server ne file accept nahi ki."
-          );
-        }
-
-        status.textContent =
-          "File print queue mein bhej di gayi hai. Printer check karein.";
-
-        form.reset();
-
-      } catch (error) {
-        status.textContent =
-          error.message ||
-          "Error aaya. Internet aur server check karein.";
-      } finally {
-        button.disabled = false;
-      }
-    });
-  </script>
+prepareBtn.addEventListener("click",async()=>{
+ if(!selectedFile){setStatus("Pehle file chunein.");return;}
+ if(!fileKind){setStatus("Sirf PDF, JPG, JPEG ya PNG chunein.");return;}
+ if(selectedFile.size===0){setStatus("File khali hai.");return;}
+ if(selectedFile.size>20*1024*1024){setStatus("Original file 20 MB se chhoti honi chahiye.");return;}
+ prepareBtn.disabled=true;printBtn.disabled=true;clearPreview();setStatus("PDF taiyar ho rahi hai...");
+ try{
+  preparedBlob=fileKind==="pdf"?await makeSelectedPdf(selectedFile):await makePhotoPdf(selectedFile);
+  if(preparedBlob.size>MAX_WORKER_SIZE){
+   preparedBlob=null;
+   throw new Error("Taiyar PDF 3 MB se badi hai. Aapke Cloudflare Worker mein abhi 3 MB ki limit hai.");
+  }
+  previewUrl=URL.createObjectURL(preparedBlob);preview.src=previewUrl;
+  preview.classList.remove("hidden");printBtn.disabled=false;
+  setStatus("Preview taiyar hai. Check karke PrintNode par bhejein.");
+ }catch(e){setStatus(e.message||"PDF taiyar nahi hui.");}
+ finally{prepareBtn.disabled=false;printBtn.disabled=!preparedBlob;}
+});
+printBtn.addEventListener("click",async()=>{
+ if(!preparedBlob)return;
+ printBtn.disabled=true;prepareBtn.disabled=true;setStatus("Print server ko file bhej rahe hain...");
+ try{
+  const data=new FormData();data.append("file",preparedBlob,"neelam-print.pdf");
+  const response=await fetch(WORKER_URL,{method:"POST",body:data});
+  let result;
+  try{result=await response.json();}catch{throw new Error("Server ka jawab nahi mila.");}
+  if(!response.ok||!result.success)throw new Error(result.error||"Print server ne file accept nahi ki.");
+  setStatus("File print queue mein bhej di gayi hai. Printer check karein. Job ID: "+(result.jobId||"sent"));
+ }catch(e){setStatus(e.message||"Internet ya server check karein.");}
+ finally{prepareBtn.disabled=false;printBtn.disabled=!preparedBlob;}
+});
+resetBtn.addEventListener("click",()=>{
+ fileInput.value="";pagesInput.value="";layoutInput.value="1";copiesInput.value="1";
+ rotationInput.value="0";zoomInput.value="1";zoomValue.textContent="1.0×";printCopiesInput.value="1";
+ selectedFile=null;fileKind=null;clearPreview();
+ pdfSettings.classList.add("hidden");photoSettings.classList.add("hidden");
+ preview.removeAttribute("src");setStatus("Reset ho gaya.");
+});
+</script>
 </body>
 </html>
-```
