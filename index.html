@@ -13,11 +13,13 @@ h2{color:#174ea6}
 label{display:block;font-weight:bold;margin:14px 0 6px}
 input,select,button{width:100%;padding:12px;font-size:16px;border:1px solid #cbd5e1;border-radius:7px}
 button{background:#1769d2;color:white;border:0;margin-top:14px;font-weight:bold;cursor:pointer}
+button:disabled{opacity:.5;cursor:not-allowed}
 .secondary{background:#475569}
 small{color:#475569}
 .hidden{display:none!important}
 #previewBox{margin-top:16px;padding:14px;border:1px solid #cbd5e1;border-radius:10px;background:#f8fafc}
-#openPdf{display:block;background:#1769d2;color:white;padding:15px;text-align:center;border-radius:8px;text-decoration:none;font-weight:bold}
+#pdfPreview{display:block;width:100%;height:650px;border:1px solid #cbd5e1;border-radius:8px;background:white}
+#openPdf{display:block;background:#475569;color:white;padding:13px;text-align:center;border-radius:8px;text-decoration:none;font-weight:bold;margin-top:10px}
 #status{overflow-wrap:anywhere;line-height:1.5}
 .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
 .note{font-size:13px;background:#eff6ff;padding:10px;border-radius:8px}
@@ -26,11 +28,11 @@ small{color:#475569}
 <body>
 <div class="wrap">
 <h2>NEELAM COMPUTER AND ONLINE</h2>
-<p>PDF या फोटो चुनें, Preview बनाएँ और PrintNode पर भेजें।</p>
+<p>PDF या फोटो चुनें, Preview देखें और PrintNode पर भेजें।</p>
 
 <label for="file">PDF या फोटो चुनें</label>
 <input id="file" type="file" accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png">
-<small>PDF, JPG, JPEG, PNG. मौजूदा Worker की सीमा 3 MB है।</small>
+<small>PDF, JPG, JPEG, PNG. Print server की मौजूदा सीमा 3 MB है।</small>
 
 <div id="pdfSettings" class="hidden">
 <label for="pages">PDF के पेज चुनें</label>
@@ -56,8 +58,10 @@ small{color:#475569}
 <div>
 <label for="rotation">Rotate</label>
 <select id="rotation">
-<option value="0">0°</option><option value="90">90°</option>
-<option value="180">180°</option><option value="270">270°</option>
+<option value="0">0°</option>
+<option value="90">90°</option>
+<option value="180">180°</option>
+<option value="270">270°</option>
 </select>
 </div>
 <div>
@@ -74,8 +78,9 @@ small{color:#475569}
 <button id="prepareBtn" type="button">Preview तैयार करें</button>
 
 <div id="previewBox" class="hidden">
-<p>PDF तैयार है। नीचे बटन दबाकर PDF खोलें।</p>
-<a id="openPdf" href="#" target="_blank" rel="noopener">PDF खोलें</a>
+<p><b>PDF Preview</b> — नीचे इसी पेज पर दस्तावेज़ देखें।</p>
+<iframe id="pdfPreview" title="PDF Preview"></iframe>
+<a id="openPdf" href="#" target="_blank" rel="noopener">PDF नए टैब में खोलें</a>
 </div>
 
 <button id="printBtn" type="button" disabled>PrintNode पर भेजें</button>
@@ -84,141 +89,312 @@ small{color:#475569}
 </div>
 
 <script>
+"use strict";
+
 const WORKER_URL="https://neelam-print-server.karanchandel25.workers.dev/";
 const MAX_WORKER_SIZE=3*1024*1024;
 const $=id=>document.getElementById(id);
-let selectedFile=null,fileKind=null,preparedBlob=null,previewUrl=null;
 
-function say(t){$("status").textContent=t}
+let selectedFile=null;
+let fileKind=null;
+let preparedBlob=null;
+let previewUrl=null;
+
+function say(message){
+  $("status").textContent=message;
+}
+
 function positiveInt(el,max,label){
- const n=Number(el.value);
- if(!Number.isInteger(n)||n<1||n>max)throw Error(label+" 1 se "+max+" ke beech rakhein.");
- return n;
+  const n=Number(el.value);
+  if(!Number.isInteger(n)||n<1||n>max){
+    throw Error(label+" 1 से "+max+" के बीच रखें।");
+  }
+  return n;
 }
+
 function loadScript(url,test){
- if(test())return Promise.resolve();
- return new Promise((resolve,reject)=>{
-  const s=document.createElement("script");s.src=url;
-  s.onload=()=>test()?resolve():reject(Error("PDF library load nahi hui."));
-  s.onerror=()=>{s.remove();reject(Error("PDF library load nahi hui. Internet check karein."))};
-  document.head.appendChild(s);
- });
+  if(test()) return Promise.resolve();
+
+  return new Promise((resolve,reject)=>{
+    const script=document.createElement("script");
+    script.src=url;
+    script.onload=()=>{
+      if(test()) resolve();
+      else reject(Error("PDF लाइब्रेरी लोड नहीं हुई।"));
+    };
+    script.onerror=()=>{
+      script.remove();
+      reject(Error("PDF लाइब्रेरी लोड नहीं हुई। इंटरनेट चेक करें।"));
+    };
+    document.head.appendChild(script);
+  });
 }
+
 async function getPDFLib(){
- await loadScript("https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js",()=>!!window.PDFLib);
- return window.PDFLib;
+  await loadScript(
+    "https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js",
+    ()=>!!window.PDFLib
+  );
+  return window.PDFLib;
 }
+
 function parsePages(text,total){
- if(!text.trim())return Array.from({length:total},(_,i)=>i);
- const set=new Set();
- for(const raw of text.split(",")){
-  const p=raw.trim(),m=p.match(/^(\d+)\s*-\s*(\d+)$/);
-  if(m){
-   const a=+m[1],b=+m[2];
-   if(a<1||b<a||b>total)throw Error("Page range 1-"+total+" ke beech rakhein.");
-   for(let n=a;n<=b;n++)set.add(n-1);
-  }else if(/^\d+$/.test(p)){
-   const n=+p;if(n<1||n>total)throw Error("Page number 1-"+total+" ke beech rakhein.");
-   set.add(n-1);
-  }else throw Error("Page aise likhein: 1-5 ya 2,5,10");
- }
- if(!set.size)throw Error("Sahi page number likhein.");
- return [...set].sort((a,b)=>a-b);
+  if(!text.trim()){
+    return Array.from({length:total},(_,i)=>i);
+  }
+
+  const set=new Set();
+
+  for(const raw of text.split(",")){
+    const part=raw.trim();
+    const match=part.match(/^(\d+)\s*-\s*(\d+)$/);
+
+    if(match){
+      const start=+match[1],end=+match[2];
+      if(start<1||end<start||end>total){
+        throw Error("पेज रेंज 1 से "+total+" के बीच रखें।");
+      }
+      for(let n=start;n<=end;n++) set.add(n-1);
+    }else if(/^\d+$/.test(part)){
+      const n=+part;
+      if(n<1||n>total){
+        throw Error("पेज नंबर 1 से "+total+" के बीच रखें।");
+      }
+      set.add(n-1);
+    }else{
+      throw Error("पेज ऐसे लिखें: 1-5 या 2,5,10");
+    }
+  }
+
+  return [...set].sort((a,b)=>a-b);
 }
+
 async function makePdf(file){
- const {PDFDocument}=await getPDFLib();
- if(fileKind==="pdf"){
-  const src=await PDFDocument.load(await file.arrayBuffer());
-  const indices=parsePages($("pages").value,src.getPageCount());
-  const count=positiveInt($("printCopies"),20,"PDF copies");
-  const out=await PDFDocument.create();
-  for(let c=0;c<count;c++){
-   const ps=await out.copyPages(src,indices);ps.forEach(p=>out.addPage(p));
+  const {PDFDocument}=await getPDFLib();
+
+  if(fileKind==="pdf"){
+    const src=await PDFDocument.load(await file.arrayBuffer());
+    const indices=parsePages($("pages").value,src.getPageCount());
+    const copies=positiveInt($("printCopies"),20,"PDF copies");
+    const out=await PDFDocument.create();
+
+    for(let c=0;c<copies;c++){
+      const pages=await out.copyPages(src,indices);
+      pages.forEach(page=>out.addPage(page));
+    }
+
+    return new Blob([await out.save()],{type:"application/pdf"});
   }
-  return new Blob([await out.save()],{type:"application/pdf"});
- }
- const img=await new Promise((resolve,reject)=>{
-  const url=URL.createObjectURL(file),im=new Image();
-  im.onload=()=>{URL.revokeObjectURL(url);resolve(im)};
-  im.onerror=()=>{URL.revokeObjectURL(url);reject(Error("Photo khul nahi pai."))};
-  im.src=url;
- });
- const total=positiveInt($("copies"),100,"Photo count");
- const per=+$("layout").value,rot=+$("rotation").value,zoom=+$("zoom").value;
- const pdf=await PDFDocument.create(),W=595.28,H=841.89,margin=18,gap=12;
- let remaining=total;
- while(remaining>0){
-  const page=pdf.addPage([W,H]),slots=Math.min(per,remaining);
-  const cols=per===1?1:2,rows=per===4?2:(per===2?2:1);
-  const cw=(W-margin*2-gap*(cols-1))/cols,ch=(H-margin*2-gap*(rows-1))/rows;
-  const canvas=document.createElement("canvas");canvas.width=1240;canvas.height=1754;
-  const ctx=canvas.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);
-  for(let i=0;i<slots;i++){
-   const col=i%cols,row=Math.floor(i/cols);
-   const x=(margin+col*(cw+gap))*1240/W,y=(margin+row*(ch+gap))*1754/H;
-   const w=(cw-6)*1240/W,h=(ch-6)*1754/H;
-   ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
-   ctx.translate(x+w/2,y+h/2);ctx.rotate(rot*Math.PI/180);
-   const swap=rot%180!==0,sw=swap?img.naturalHeight:img.naturalWidth,sh=swap?img.naturalWidth:img.naturalHeight;
-   const scale=Math.max(w/sw,h/sh)*zoom;
-   ctx.drawImage(img,-img.naturalWidth*scale/2,-img.naturalHeight*scale/2,img.naturalWidth*scale,img.naturalHeight*scale);
-   ctx.restore();
+
+  const img=await new Promise((resolve,reject)=>{
+    const url=URL.createObjectURL(file);
+    const image=new Image();
+
+    image.onload=()=>{
+      URL.revokeObjectURL(url);
+      resolve(image);
+    };
+    image.onerror=()=>{
+      URL.revokeObjectURL(url);
+      reject(Error("फोटो खुल नहीं पाई।"));
+    };
+    image.src=url;
+  });
+
+  const total=positiveInt($("copies"),100,"Photo count");
+  const per=+$("layout").value;
+  const rotation=+$("rotation").value;
+  const zoom=+$("zoom").value;
+
+  const pdf=await PDFDocument.create();
+  const W=595.28,H=841.89,margin=18,gap=12;
+  let remaining=total;
+
+  while(remaining>0){
+    const page=pdf.addPage([W,H]);
+    const slots=Math.min(per,remaining);
+    const cols=per===1?1:2;
+    const rows=per===4?2:(per===2?2:1);
+    const cw=(W-margin*2-gap*(cols-1))/cols;
+    const ch=(H-margin*2-gap*(rows-1))/rows;
+
+    const canvas=document.createElement("canvas");
+    canvas.width=1240;
+    canvas.height=1754;
+
+    const ctx=canvas.getContext("2d");
+    ctx.fillStyle="#fff";
+    ctx.fillRect(0,0,canvas.width,canvas.height);
+
+    for(let i=0;i<slots;i++){
+      const col=i%cols,row=Math.floor(i/cols);
+      const x=(margin+col*(cw+gap))*1240/W;
+      const y=(margin+row*(ch+gap))*1754/H;
+      const w=(cw-6)*1240/W;
+      const h=(ch-6)*1754/H;
+
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(x,y,w,h);
+      ctx.clip();
+      ctx.translate(x+w/2,y+h/2);
+      ctx.rotate(rotation*Math.PI/180);
+
+      const swap=rotation%180!==0;
+      const sw=swap?img.naturalHeight:img.naturalWidth;
+      const sh=swap?img.naturalWidth:img.naturalHeight;
+      const scale=Math.max(w/sw,h/sh)*zoom;
+
+      ctx.drawImage(
+        img,
+        -img.naturalWidth*scale/2,
+        -img.naturalHeight*scale/2,
+        img.naturalWidth*scale,
+        img.naturalHeight*scale
+      );
+      ctx.restore();
+    }
+
+    const jpg=await new Promise(resolve=>
+      canvas.toBlob(resolve,"image/jpeg",0.85)
+    );
+
+    if(!jpg) throw Error("फोटो PDF नहीं बन पाई।");
+
+    const embedded=await pdf.embedJpg(await jpg.arrayBuffer());
+    page.drawImage(embedded,{x:0,y:0,width:W,height:H});
+    remaining-=slots;
   }
-  const jpg=await new Promise(resolve=>canvas.toBlob(resolve,"image/jpeg",.85));
-  if(!jpg)throw Error("Photo PDF nahi ban pai.");
-  const embedded=await pdf.embedJpg(await jpg.arrayBuffer());
-  page.drawImage(embedded,{x:0,y:0,width:W,height:H});
-  remaining-=slots;
- }
- return new Blob([await pdf.save()],{type:"application/pdf"});
+
+  return new Blob([await pdf.save()],{type:"application/pdf"});
 }
+
 function clearPreview(){
- preparedBlob=null;$("printBtn").disabled=true;$("previewBox").classList.add("hidden");
- $("openPdf").removeAttribute("href");
- if(previewUrl){URL.revokeObjectURL(previewUrl);previewUrl=null}
+  preparedBlob=null;
+  $("printBtn").disabled=true;
+  $("previewBox").classList.add("hidden");
+  $("openPdf").removeAttribute("href");
+  $("pdfPreview").removeAttribute("src");
+
+  if(previewUrl){
+    URL.revokeObjectURL(previewUrl);
+    previewUrl=null;
+  }
 }
+
 $("file").addEventListener("change",()=>{
- clearPreview();selectedFile=$("file").files[0]||null;
- const n=selectedFile?.name.toLowerCase()||"";
- fileKind=n.endsWith(".pdf")?"pdf":(/\.(jpg|jpeg|png)$/.test(n)?"image":null);
- $("pdfSettings").classList.toggle("hidden",fileKind!=="pdf");
- $("photoSettings").classList.toggle("hidden",fileKind!=="image");
- say(selectedFile?(fileKind?"File chuni gayi: "+selectedFile.name:"Sirf PDF, JPG ya PNG chunein"):"");
+  clearPreview();
+  selectedFile=$("file").files[0]||null;
+
+  const name=selectedFile?.name.toLowerCase()||"";
+  fileKind=name.endsWith(".pdf")
+    ?"pdf"
+    :(/\.(jpg|jpeg|png)$/.test(name)?"image":null);
+
+  $("pdfSettings").classList.toggle("hidden",fileKind!=="pdf");
+  $("photoSettings").classList.toggle("hidden",fileKind!=="image");
+
+  say(selectedFile
+    ?(fileKind?"फाइल चुनी गई: "+selectedFile.name:"सिर्फ PDF, JPG या PNG चुनें")
+    :"");
 });
-$("zoom").addEventListener("input",()=>$("zoomValue").textContent=(+$("zoom").value).toFixed(1)+"×");
+
+$("zoom").addEventListener("input",()=>{
+  $("zoomValue").textContent=(+$("zoom").value).toFixed(1)+"×";
+});
 
 $("prepareBtn").addEventListener("click",async()=>{
- if(!selectedFile||!fileKind){say("Pehle PDF ya photo chunein.");return}
- if(selectedFile.size>20*1024*1024){say("File 20 MB se chhoti honi chahiye.");return}
- $("prepareBtn").disabled=true;clearPreview();say("PDF taiyar ho rahi hai...");
- try{
-  preparedBlob=await makePdf(selectedFile);
-  if(preparedBlob.size>MAX_WORKER_SIZE){preparedBlob=null;throw Error("Taiyar PDF 3 MB se badi hai. Cloudflare Worker ki limit badhani hogi.")}
-  previewUrl=URL.createObjectURL(preparedBlob);
-  $("openPdf").href=previewUrl;
-  $("previewBox").classList.remove("hidden");
-  $("printBtn").disabled=false;
-  say("PDF taiyar hai. PDF khol kar check karein.");
- }catch(e){say(e.message||"PDF taiyar nahi hui.")}
- finally{$("prepareBtn").disabled=false;$("printBtn").disabled=!preparedBlob}
+  if(!selectedFile||!fileKind){
+    say("पहले PDF या फोटो चुनें।");
+    return;
+  }
+
+  if(selectedFile.size>20*1024*1024){
+    say("फाइल 20 MB से छोटी होनी चाहिए।");
+    return;
+  }
+
+  $("prepareBtn").disabled=true;
+  clearPreview();
+  say("PDF तैयार हो रही है...");
+
+  try{
+    preparedBlob=await makePdf(selectedFile);
+
+    if(preparedBlob.size>MAX_WORKER_SIZE){
+      preparedBlob=null;
+      throw Error("तैयार PDF 3 MB से बड़ी है। Worker की सीमा बढ़ानी होगी।");
+    }
+
+    previewUrl=URL.createObjectURL(preparedBlob);
+
+    $("openPdf").href=previewUrl;
+    $("pdfPreview").src=previewUrl+"#toolbar=1&navpanes=0&view=FitH";
+    $("previewBox").classList.remove("hidden");
+    $("printBtn").disabled=false;
+
+    say("PDF तैयार है। नीचे Preview देखें।");
+  }catch(error){
+    say(error.message||"PDF तैयार नहीं हुई।");
+  }finally{
+    $("prepareBtn").disabled=false;
+    $("printBtn").disabled=!preparedBlob;
+  }
 });
+
 $("printBtn").addEventListener("click",async()=>{
- if(!preparedBlob)return;
- $("printBtn").disabled=true;$("prepareBtn").disabled=true;say("Print server ko bhej rahe hain...");
- try{
-  const data=new FormData();data.append("file",preparedBlob,"neelam-print.pdf");
-  const r=await fetch(WORKER_URL,{method:"POST",body:data});
-  let result;try{result=await r.json()}catch{throw Error("Server ka jawab nahi mila.")}
-  if(!r.ok||!result.success)throw Error(result.error||"Print server ne file accept nahi ki.");
-  say("File print queue mein bhej di gayi. Printer check karein. Job ID: "+(result.jobId||"sent"));
- }catch(e){say(e.message||"Internet ya server check karein.")}
- finally{$("prepareBtn").disabled=false;$("printBtn").disabled=!preparedBlob}
+  if(!preparedBlob) return;
+
+  $("printBtn").disabled=true;
+  $("prepareBtn").disabled=true;
+  say("Print server को भेज रहे हैं...");
+
+  try{
+    const data=new FormData();
+    data.append("file",preparedBlob,"neelam-print.pdf");
+
+    const response=await fetch(WORKER_URL,{
+      method:"POST",
+      body:data
+    });
+
+    let result;
+    try{
+      result=await response.json();
+    }catch{
+      throw Error("Server का जवाब नहीं मिला।");
+    }
+
+    if(!response.ok||!result.success){
+      throw Error(result.error||"Print server ने फाइल स्वीकार नहीं की।");
+    }
+
+    say("फाइल प्रिंट कतार में भेज दी गई। प्रिंटर चेक करें। Job ID: "+(result.jobId||"sent"));
+  }catch(error){
+    say(error.message||"इंटरनेट या सर्वर चेक करें।");
+  }finally{
+    $("prepareBtn").disabled=false;
+    $("printBtn").disabled=!preparedBlob;
+  }
 });
+
 $("resetBtn").addEventListener("click",()=>{
- $("file").value="";$("pages").value="";$("layout").value="1";$("copies").value="1";
- $("rotation").value="0";$("zoom").value="1";$("zoomValue").textContent="1.0×";$("printCopies").value="1";
- selectedFile=null;fileKind=null;clearPreview();$("pdfSettings").classList.add("hidden");
- $("photoSettings").classList.add("hidden");say("Reset ho gaya.");
+  $("file").value="";
+  $("pages").value="";
+  $("layout").value="1";
+  $("copies").value="1";
+  $("rotation").value="0";
+  $("zoom").value="1";
+  $("zoomValue").textContent="1.0×";
+  $("printCopies").value="1";
+
+  selectedFile=null;
+  fileKind=null;
+  clearPreview();
+
+  $("pdfSettings").classList.add("hidden");
+  $("photoSettings").classList.add("hidden");
+  say("रीसेट हो गया।");
 });
 </script>
 </body>
